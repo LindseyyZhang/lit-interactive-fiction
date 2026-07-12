@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hamlet — An Interactive Tragedy</title>
+<style>
+  :root{
+    --stone: #262A35;
+    --stone-deep: #14161D;
+    --parchment: #E9E1CC;
+    --parchment-edge: #CBBFA0;
+    --iron: #52565F;
+    --iron-soft: #71757E;
+    --blood: #7A2E32;
+    --frost: #5E7A8C;
+    --gold: #B08A4E;
+    --pearl: #C7BEA3;
+    --ink-text: #211D18;
+    --font-display: "EB Garamond", "Cormorant Garamond", Georgia, serif;
+    --font-body: "EB Garamond", Georgia, serif;
+    --font-utility: "EB Garamond", Georgia, serif;
+    --font-roman: "EB Garamond", "Times New Roman", Georgia, serif;
+  }
+
+  *{ box-sizing: border-box; margin:0; padding:0; }
+
+  html,body{
+    min-height:100vh;
+    background: var(--stone-deep);
+    color: var(--ink-text);
+    font-family: var(--font-body);
+    overflow-x:hidden;
+  }
+
+  /* scene layers */
+  .scene-layer{
+    position:fixed; inset:0; z-index:0;
+    background-size: cover;
+    background-position: center;
+    opacity:0;
+    transition: opacity 1.5s ease;
+    will-change: transform;
+  }
+  .scene-layer.active{ opacity:1; }
+
+  .scene-overlay{
+    position:fixed; inset:0; z-index:1;
+    background: linear-gradient(180deg,
+      rgba(20,22,29,0.3) 0%,
+      rgba(20,22,29,0.1) 30%,
+      rgba(20,22,29,0.4) 70%,
+      rgba(20,22,29,0.85) 100%);
+    pointer-events:none;
+  }
+
+  .particle-layer{
+    position:fixed; inset:0; z-index:2;
+    pointer-events:none; overflow:hidden;
+  }
+  .particle{ position:absolute; animation: fall linear infinite; }
+  @keyframes fall{
+    0%{ transform: translateY(-10vh) rotate(0deg); opacity:0; }
+    10%{ opacity:0.6; }
+    90%{ opacity:0.4; }
+    100%{ transform: translateY(110vh) rotate(360deg); opacity:0; }
+  }
+
+  .fire-glow{
+    position:fixed; inset:0; z-index:2;
+    pointer-events:none; opacity:0;
+    background: radial-gradient(ellipse at 50% 60%, rgba(122,46,50,0.18) 0%, transparent 60%);
+    animation: firePulse 2s ease-in-out infinite alternate;
+    transition: opacity 1.5s ease;
+  }
+  .fire-glow.active{ opacity:1; }
+  @keyframes firePulse{ 0%{ opacity:0.3; } 100%{ opacity:0.7; } }
+
+  .mist-layer{
+    position:fixed; bottom:0; left:0; right:0; height:40vh; z-index:2;
+    pointer-events:none;
+    background: linear-gradient(0deg, rgba(233,225,204,0.07) 0%, transparent 100%);
+    animation: mistDrift 12s ease-in-out infinite alternate;
+  }
+  @keyframes mistDrift{
+    0%{ transform: translateX(-20px); opacity:0.5; }
+    100%{ transform: translateX(20px); opacity:0.8; }
+  }
+
+  .light-rays{
+    position:fixed; inset:0; z-index:2;
+    pointer-events:none; opacity:0;
+    background:
+      linear-gradient(105deg, transparent 40%, rgba(233,225,204,0.05) 45%, transparent 52%),
+      linear-gradient(100deg, transparent 60%, rgba(233,225,204,0.04) 66%, transparent 74%),
+      linear-gradient(110deg, transparent 20%, rgba(233,225,204,0.03) 28%, transparent 36%);
+    animation: raysDrift 18s ease-in-out infinite alternate;
+    transition: opacity 2s ease;
+  }
+  .light-rays.active{ opacity:1; }
+  @keyframes raysDrift{
+    0%{ transform: translateX(-30px) skewX(0deg); }
+    100%{ transform: translateX(30px) skewX(1deg); }
+  }
+
+  .firefly{
+    position:absolute; width:4px; height:4px; border-radius:50%;
+    background: rgba(220,230,150,0.9);
+    box-shadow: 0 0 8px 2px rgba(200,220,120,0.5);
+    animation: fireflyDrift ease-in-out infinite, fireflyGlow ease-in-out infinite;
+  }
+  @keyframes fireflyDrift{
+    0%{ transform: translate(0,0); }
+    25%{ transform: translate(30px,-40px); }
+    50%{ transform: translate(-20px,-80px); }
+    75%{ transform: translate(25px,-120px); }
+    100%{ transform: translate(0,-160px); }
+  }
+  @keyframes fireflyGlow{
+    0%,100%{ opacity:0; }
+    20%,80%{ opacity:1; }
+    50%{ opacity:0.3; }
+  }
+
+  .raindrop{
+    position:absolute; width:1px; height:14px;
+    background: linear-gradient(180deg, transparent, rgba(180,195,210,0.45));
+    animation: rainFall linear infinite;
+  }
+  @keyframes rainFall{
+    0%{ transform: translateY(-10vh); opacity:0; }
+    10%{ opacity:0.7; }
+    95%{ opacity:0.5; }
+    100%{ transform: translateY(110vh); opacity:0; }
+  }
+
+  .star{
+    position:absolute; border-radius:50%;
+    background: rgba(230,228,215,0.9);
+    animation: starTwinkle ease-in-out infinite;
+  }
+  @keyframes starTwinkle{
+    0%,100%{ opacity:0.2; transform: scale(0.8); }
+    50%{ opacity:0.9; transform: scale(1.1); }
+  }
+
+  .character-portrait{
+    position:fixed; z-index:3;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity:0; transform: translateY(20px);
+    filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5));
+  }
+  .character-portrait.active{ opacity:1; transform: translateY(0); }
+  .character-portrait.left{ left:5%; bottom:10%; width:280px; }
+  .character-portrait.right{ right:5%; bottom:10%; width:280px; }
+  .character-portrait img{
+    width:100%; height:auto; border-radius: 4px;
+    mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  }
+  .character-name{
+    position:absolute; bottom:-30px; left:50%; transform:translateX(-50%);
+    font-family: var(--font-utility); font-size: 12px; letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--parchment); opacity:0.7; white-space:nowrap;
+  }
+
+  .stage{
+    position:relative; z-index:10;
+    min-height:100vh;
+    display:flex; align-items:flex-end; justify-content:center;
+    padding: 40px 18px 60px;
+  }
+  .book{
+    width:100%; max-width:720px;
+    margin-bottom: 5vh;
+  }
+  .page{
+    background: rgba(233,225,204,0.93);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(203,191,160,0.6);
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,0.6);
+    padding: 38px 40px 34px;
+    position:relative;
+    animation: pageEnter 0.6s ease;
+  }
+  @keyframes pageEnter{
+    from{ opacity:0; transform: translateY(30px); }
+    to{ opacity:1; transform: translateY(0); }
+  }
+  .page::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:5px;
+    background: linear-gradient(90deg, var(--iron) 0%, var(--iron-soft) 50%, var(--iron) 100%);
+  }
+  .page.ending::before{
+    background: linear-gradient(90deg, var(--accent, var(--iron)) 0%, var(--iron-soft) 50%, var(--accent, var(--iron)) 100%);
+  }
+
+  @media (max-width: 540px){
+    .page{ padding: 28px 22px 26px; }
+    .character-portrait{ width:180px !important; }
+  }
+
+  .eyebrow{
+    display:flex; align-items:baseline; gap:10px;
+    font-family: var(--font-utility); font-size: 12px; letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--iron); margin-bottom: 4px;
+  }
+  .eyebrow .roman{
+    font-family: var(--font-roman); font-style: italic; font-size: 15px; color: var(--gold);
+    text-transform: none;
+  }
+  .eyebrow .twig-rule{ flex:1; height:1px; background: var(--parchment-edge); }
+  h1.title{
+    font-family: var(--font-display); font-weight:700;
+    font-size: clamp(22px, 5vw, 30px); margin: 6px 0 18px;
+  }
+
+  .stats{
+    display:flex; flex-direction:column; gap:6px;
+    margin: 6px 0 26px; padding: 14px 16px;
+    background: rgba(255,255,255,0.22);
+    border: 1px solid rgba(203,191,160,0.5);
+  }
+  .stat-row{ display:flex; align-items:center; gap:10px; }
+  .stat-label{
+    font-family: var(--font-utility); font-size: 11.5px;
+    letter-spacing: .1em; text-transform: uppercase; width: 64px; flex-shrink:0;
+  }
+  .stat-label.resolve{ color: var(--blood); }
+  .stat-label.reason{ color: var(--frost); }
+  .stat-label.bond{ color: var(--gold); }
+  .leaf-track{ display:flex; gap:4px; }
+  .leaf-icon{ width:13px; height:13px; }
+  .leaf-icon.empty path{ fill: rgba(33,29,24,.14); }
+  .leaf-icon.pulse{ animation: leafPop .5s ease; }
+  @keyframes leafPop{ 0%{ transform: scale(.4); } 60%{ transform: scale(1.25); } 100%{ transform: scale(1); } }
+
+  .story{ font-size: 16.5px; line-height: 1.95; }
+  .story p{ margin: 0 0 1em; }
+  .story p:first-of-type::first-letter{
+    font-family: var(--font-display); font-weight:700;
+    font-size: 2.5em; line-height: .8; float:left;
+    padding: 4px 8px 0 0; color: var(--iron);
+  }
+  .reaction{
+    font-style: italic; color: var(--iron);
+    border-left: 2px solid var(--parchment-edge);
+    padding-left: 12px; margin: 18px 0 0; font-size: 15px;
+  }
+
+  .choices{ list-style:none; margin: 26px 0 0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .choice-btn{
+    width:100%; text-align:left; display:flex; align-items:center; gap:12px;
+    background:none; border:none; border-top: 1px solid rgba(203,191,160,0.6);
+    font-family: var(--font-body); font-size: 15.5px; color: var(--ink-text);
+    padding: 13px 4px; cursor:pointer; min-height:44px;
+    transition: all .3s ease;
+  }
+  .choices li:last-child .choice-btn{ border-bottom: 1px solid rgba(203,191,160,0.6); }
+  .choice-btn:hover{ color: var(--blood); padding-left: 12px; background: rgba(122,46,50,0.05); }
+  .choice-btn:active{ transform: translateX(2px); }
+  .choice-twig svg{ width:14px; height:14px; flex-shrink:0; fill: var(--iron-soft); }
+
+  .continue-row{ margin-top: 28px; display:flex; justify-content:flex-end; }
+  .btn-continue, .btn-start, .btn-restart{
+    font-family: var(--font-utility); font-size: 13px; letter-spacing:.08em;
+    text-transform: uppercase;
+    background: var(--iron); color: var(--parchment);
+    border:none; padding: 11px 22px; cursor:pointer;
+    transition: all .3s ease;
+  }
+  .btn-continue:hover, .btn-start:hover, .btn-restart:hover{
+    background: var(--stone-deep); transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  .cover{ text-align:center; padding: 18px 6px 4px; }
+  .cover .kicker{
+    font-family: var(--font-utility); font-size: 11.5px; letter-spacing:.22em;
+    text-transform: uppercase;
+    color: var(--iron); margin-bottom: 14px;
+  }
+  .cover h1{ font-size: clamp(30px, 7vw, 42px); margin: 0 0 16px; font-family: var(--font-display); font-weight:700; letter-spacing:.01em; }
+  .cover .lede{ font-size: 15.5px; line-height:1.9; max-width: 440px; margin: 0 auto 26px; }
+  .cover .credit{ font-family: var(--font-utility); font-size: 11px; color: var(--iron-soft); margin-top: 26px; line-height:1.6; }
+  .cover-divider{ width:48px; height:1px; background: var(--iron-soft); margin: 0 auto 26px; }
+
+  .ending-tag{ font-family: var(--font-utility); font-size: 12px; letter-spacing:.18em; text-transform: uppercase; color: var(--accent, var(--gold)); margin-bottom: 6px; }
+  .ending-tagline{ font-family: var(--font-display); font-style: italic; font-size: 16px; color: var(--iron); margin: -6px 0 22px; line-height:1.5; }
+  .epigraph{ margin: 24px 0 0; padding: 16px 18px; border-left: 2px solid var(--accent, var(--iron)); background: rgba(0,0,0,0.03); font-style: italic; font-size: 14.5px; line-height:1.8; }
+  .epigraph-source{ display:block; margin-top:8px; font-style:normal; font-family: var(--font-utility); font-size: 11px; letter-spacing:.03em; color: var(--iron-soft); }
+  .ending-stats{ margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--parchment-edge); font-family: var(--font-utility); font-size: 12px; color: var(--iron); }
+  .ending-lean{ margin-top: 4px; }
+
+  .audio-control{
+    position:fixed; top:20px; right:20px; z-index:100;
+    width:40px; height:40px;
+    background: rgba(233,225,204,0.15);
+    border: 1px solid rgba(233,225,204,0.3);
+    border-radius: 50%;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px);
+  }
+  .audio-control:hover{ background: rgba(233,225,204,0.3); }
+  .audio-control svg{ width:18px; height:18px; fill: var(--parchment); }
+  .audio-control.muted{ opacity:0.5; }
+
+  .loading-screen{
+    position:fixed; inset:0; z-index:1000;
+    background: var(--stone-deep);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    transition: opacity 1s ease, visibility 1s ease;
+  }
+  .loading-screen.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
+  .loading-mark{ width:52px; height:52px; animation: spin 2s ease-in-out infinite; }
+  @keyframes spin{ 0%{ transform: rotate(0deg); } 50%{ transform: rotate(180deg) scale(1.1); } 100%{ transform: rotate(360deg); } }
+  .loading-text{ font-family: var(--font-utility); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--parchment); opacity:0.6; margin-top: 20px; }
+
+  .footer-note{ text-align:center; margin-top: 22px; font-family: var(--font-utility); font-size: 11px; color: rgba(233,225,204,.45); }
+</style>
+<base target="_blank">
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <svg class="loading-mark" viewBox="0 0 24 24"><path d="M12 2L20 12L12 22L4 12Z" fill="#7E93A0"/></svg>
+  <div class="loading-text">Entering Elsinore...</div>
+</div>
+
+<div class="scene-layer" id="sceneBg"></div>
+<div class="scene-overlay"></div>
+<div class="particle-layer" id="particleLayer"></div>
+<div class="fire-glow" id="fireGlow"></div>
+<div class="mist-layer" id="mistLayer"></div>
+<div class="light-rays" id="lightRays"></div>
+
+<div class="character-portrait" id="charPortrait">
+  <img src="" alt="" id="charImg">
+  <div class="character-name" id="charName"></div>
+</div>
+
+<div class="audio-control" id="audioControl" onclick="toggleAudio()">
+  <svg id="audioIcon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+</div>
+
+<div class="stage">
+  <div class="book">
+    <div id="sceneRoot"></div>
+    <div class="footer-note">A tragedy about hesitation, and what it costs.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ===================== audio system =====================
+  var audioCtx = null;
+  var audioEnabled = true;
+  var bgmOscillator = null;
+  var bgmGain = null;
+
+  function initAudio(){
+    if(!audioCtx){
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+    }
+  }
+
+  function playTone(freq, duration, type, volume){
+    if(!audioEnabled || !audioCtx) return;
+    try {
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(volume || 0.1, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    } catch(e) {}
+  }
+
+  function playAmbientBgm(){
+    if(!audioEnabled || !audioCtx || bgmOscillator) return;
+    try {
+      bgmOscillator = audioCtx.createOscillator();
+      bgmGain = audioCtx.createGain();
+      bgmOscillator.type = 'sine';
+      bgmOscillator.frequency.setValueAtTime(98, audioCtx.currentTime);
+      bgmGain.gain.setValueAtTime(0.025, audioCtx.currentTime);
+      bgmOscillator.connect(bgmGain);
+      bgmGain.connect(audioCtx.destination);
+      bgmOscillator.start();
+    } catch(e) {}
+  }
+
+  function stopAmbientBgm(){
+    if(bgmOscillator){
+      try { bgmOscillator.stop(); } catch(e) {}
+      bgmOscillator = null;
+    }
+  }
+
+  function playChoiceSound(){
+    playTone(392, 0.15, 'sine', 0.08);
+    setTimeout(function(){ playTone(494, 0.15, 'sine', 0.06); }, 80);
+  }
+
+  function playPageTurnSound(){
+    playTone(294, 0.3, 'triangle', 0.05);
+  }
+
+  function playFireSound(){
+    if(!audioEnabled || !audioCtx) return;
+    try {
+      var bufferSize = audioCtx.sampleRate * 2;
+      var buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      var data = buffer.getChannelData(0);
+      for(var i = 0; i < bufferSize; i++){
+        data[i] = (Math.random() * 2 - 1) * 0.05;
+      }
+      var noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      var filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 400;
+      var gain = audioCtx.createGain();
+      gain.gain.value = 0.08;
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      noise.start();
+      noise.stop(audioCtx.currentTime + 3);
+    } catch(e) {}
+  }
+
+  window.toggleAudio = function(){
+    audioEnabled = !audioEnabled;
+    var btn = document.getElementById('audioControl');
+    var icon = document.getElementById('audioIcon');
+    if(audioEnabled){
+      btn.classList.remove('muted');
+      icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+      initAudio();
+      playAmbientBgm();
+    } else {
+      btn.classList.add('muted');
+      icon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 1L9.91 3.09 12 5.18V1z"/>';
+      stopAmbientBgm();
+    }
+  };
+
+  // ===================== scene system =====================
+  var sceneImages = {
+    cover: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1920&q=80',
+    ch1: 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1920&q=80',
+    ch2: 'https://images.unsplash.com/photo-1520271348391-049dd132bb7f?w=1920&q=80',
+    ch3: 'https://images.unsplash.com/photo-1500534623283-312aade485b7?w=1920&q=80',
+    ch4: 'https://images.unsplash.com/photo-1541963463532-d68292c34b19?w=1920&q=80',
+    ending: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=1920&q=80'
+  };
+
+  var sceneGradients = {
+    cover:  'linear-gradient(160deg,#0b0d14 0%,#1a2030 45%,#221820 100%)',
+    ch1:    'linear-gradient(160deg,#0a0c14 0%,#141a28 50%,#0e1220 100%)',
+    ch2:    'linear-gradient(160deg,#241c12 0%,#332619 50%,#1c150e 100%)',
+    ch3:    'linear-gradient(160deg,#1a1e20 0%,#242c2b 50%,#151a1a 100%)',
+    ch4:    'linear-gradient(160deg,#2e1210 0%,#3a1a10 50%,#180a08 100%)',
+    ending: 'linear-gradient(160deg,#12141c 0%,#1c2130 55%,#0f1119 100%)'
+  };
+
+  function setScene(sceneKey, options){
+    options = options || {};
+    var bg = document.getElementById('sceneBg');
+    var fire = document.getElementById('fireGlow');
+    var mist = document.getElementById('mistLayer');
+    var particles = document.getElementById('particleLayer');
+
+    var imgUrl = sceneImages[sceneKey] || sceneImages.cover;
+
+    bg.style.background = sceneGradients[sceneKey] || sceneGradients.cover;
+    bg.classList.add('active');
+
+    var img = new Image();
+    img.onload = function(){
+      bg.style.backgroundImage = 'url(' + imgUrl + ')';
+      bg.style.backgroundSize = 'cover';
+      bg.style.backgroundPosition = 'center';
+    };
+    img.onerror = function(){};
+    img.src = imgUrl;
+
+    if(options.fire){
+      fire.classList.add('active');
+      playFireSound();
+    } else {
+      fire.classList.remove('active');
+    }
+
+    mist.style.opacity = options.mist !== false ? '1' : '0';
+
+    var rays = document.getElementById('lightRays');
+    if(rays){
+      if(options.rays){ rays.classList.add('active'); }
+      else { rays.classList.remove('active'); }
+    }
+
+    particles.innerHTML = '';
+    if(options.particles === 'leaves'){
+      createLeaves();
+    } else if(options.particles === 'embers'){
+      createEmbers();
+    } else if(options.particles === 'snow'){
+      createSnow();
+    } else if(options.particles === 'fireflies'){
+      createFireflies();
+    } else if(options.particles === 'rain'){
+      createRain();
+    } else if(options.particles === 'stars'){
+      createStars();
+    }
+  }
+
+  function createLeaves(){
+    var container = document.getElementById('particleLayer');
+    for(var i = 0; i < 15; i++){
+      var leaf = document.createElement('div');
+      leaf.className = 'particle';
+      leaf.style.left = Math.random() * 100 + '%';
+      leaf.style.animationDuration = (8 + Math.random() * 12) + 's';
+      leaf.style.animationDelay = Math.random() * 10 + 's';
+      leaf.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24"><path d="M12 2L20 12L12 22L4 12Z" fill="rgba(176,138,78,' + (0.25 + Math.random() * 0.35) + ')"/></svg>';
+      container.appendChild(leaf);
+    }
+  }
+
+  function createEmbers(){
+    var container = document.getElementById('particleLayer');
+    for(var i = 0; i < 20; i++){
+      var ember = document.createElement('div');
+      ember.className = 'particle';
+      ember.style.left = Math.random() * 100 + '%';
+      ember.style.animationDuration = (3 + Math.random() * 5) + 's';
+      ember.style.animationDelay = Math.random() * 5 + 's';
+      ember.innerHTML = '<div style="width:4px;height:4px;border-radius:50%;background:rgba(184,74,58,' + (0.4 + Math.random() * 0.6) + ');box-shadow:0 0 6px rgba(184,74,58,0.5);"></div>';
+      container.appendChild(ember);
+    }
+  }
+
+  function createSnow(){
+    var container = document.getElementById('particleLayer');
+    for(var i = 0; i < 25; i++){
+      var snow = document.createElement('div');
+      snow.className = 'particle';
+      snow.style.left = Math.random() * 100 + '%';
+      snow.style.animationDuration = (6 + Math.random() * 10) + 's';
+      snow.style.animationDelay = Math.random() * 8 + 's';
+      snow.innerHTML = '<div style="width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,' + (0.3 + Math.random() * 0.5) + ');"></div>';
+      container.appendChild(snow);
+    }
+  }
+
+  function createFireflies(){
+    var container = document.getElementById('particleLayer');
+    for(var i = 0; i < 12; i++){
+      var fly = document.createElement('div');
+      fly.className = 'firefly';
+      fly.style.left = (5 + Math.random() * 90) + '%';
+      fly.style.top = (30 + Math.random() * 65) + '%';
+      fly.style.animationDuration = (10 + Math.random() * 8) + 's, ' + (2 + Math.random() * 3) + 's';
+      fly.style.animationDelay = Math.random() * 6 + 's, ' + Math.random() * 2 + 's';
+      container.appendChild(fly);
+    }
+  }
+
+  function createRain(){
+    var container = document.getElementById('particleLayer');
+    for(var i = 0; i < 60; i++){
+      var drop = document.createElement('div');
+      drop.className = 'raindrop';
+      drop.style.left = Math.random() * 100 + '%';
+      drop.style.animationDuration = (0.6 + Math.random() * 0.5) + 's';
+      drop.style.animationDelay = Math.random() * 2 + 's';
+      container.appendChild(drop);
+    }
+  }
+
+  function createStars(){
+    var container = document.getElementById('particleLayer');
+    for(var i = 0; i < 40; i++){
+      var star = document.createElement('div');
+      star.className = 'star';
+      var size = 1 + Math.random() * 2;
+      star.style.width = size + 'px';
+      star.style.height = size + 'px';
+      star.style.left = Math.random() * 100 + '%';
+      star.style.top = Math.random() * 55 + '%';
+      star.style.animationDuration = (2 + Math.random() * 4) + 's';
+      star.style.animationDelay = Math.random() * 4 + 's';
+      container.appendChild(star);
+    }
+  }
+
+  (function initParallax(){
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var bg = document.getElementById('sceneBg');
+    if(!bg) return;
+    var targetX = 0, targetY = 0, curX = 0, curY = 0, raf = null;
+    function tick(){
+      curX += (targetX - curX) * 0.06;
+      curY += (targetY - curY) * 0.06;
+      bg.style.transform = 'scale(1.06) translate(' + curX + 'px,' + curY + 'px)';
+      raf = (Math.abs(targetX-curX) > 0.1 || Math.abs(targetY-curY) > 0.1) ? requestAnimationFrame(tick) : null;
+    }
+    function kick(){ if(!raf) raf = requestAnimationFrame(tick); }
+    document.addEventListener('mousemove', function(e){
+      targetX = (e.clientX / window.innerWidth - 0.5) * -14;
+      targetY = (e.clientY / window.innerHeight - 0.5) * -8;
+      kick();
+    });
+    if(window.DeviceOrientationEvent){
+      window.addEventListener('deviceorientation', function(e){
+        if(e.gamma === null) return;
+        targetX = Math.max(-14, Math.min(14, e.gamma * -0.6));
+        targetY = Math.max(-8, Math.min(8, (e.beta - 45) * -0.3));
+        kick();
+      });
+    }
+  })();
+
+  // ===================== character portraits =====================
+  function showCharacter(imgUrl, name, position){
+    var portrait = document.getElementById('charPortrait');
+    var img = document.getElementById('charImg');
+    var nameEl = document.getElementById('charName');
+
+    portrait.classList.remove('active', 'left', 'right');
+
+    if(!imgUrl){
+      setTimeout(function(){ portrait.classList.remove('active'); }, 300);
+      return;
+    }
+
+    img.src = imgUrl;
+    img.alt = name || '';
+    nameEl.textContent = name || '';
+    portrait.classList.add(position || 'right');
+
+    setTimeout(function(){
+      portrait.classList.add('active');
+    }, 100);
+  }
+
+  // ===================== game state =====================
+  var stats = { resolve: 0, reason: 0, bond: 0 };
+  var flags = { ophelia: null };
+
+  function leafIconColored(filled, cls, pulse){
+    var color = filled ? 'var(--'+(cls==='resolve'?'blood':cls==='reason'?'frost':'gold')+')' : 'rgba(33,29,24,.14)';
+    return '<svg class="leaf-icon'+(pulse?' pulse':'')+'" viewBox="0 0 24 24">' +
+      '<path d="M12 2L20 12L12 22L4 12Z" fill="'+color+'"/></svg>';
+  }
+
+  function statRow(label, cls, value, changedKey){
+    var leaves = '';
+    var filledCount = Math.min(6, Math.round(value/2));
+    for(var i=0;i<6;i++){
+      var filled = i < filledCount;
+      var pulse = changedKey===cls && i === filledCount-1;
+      leaves += leafIconColored(filled, cls, pulse);
+    }
+    return '<div class="stat-row"><span class="stat-label '+cls+'">'+label+'</span><span class="leaf-track">'+leaves+'</span></div>';
+  }
+
+  function renderStats(changedKey){
+    return '<div class="stats">' +
+      statRow('Resolve','resolve', stats.resolve, changedKey) +
+      statRow('Reason','reason', stats.reason, changedKey) +
+      statRow('Bond','bond', stats.bond, changedKey) +
+      '</div>';
+  }
+
+  function choiceTwigSVG(){
+    return '<span class="choice-twig"><svg viewBox="0 0 24 24"><path d="M12 2L20 12L12 22L4 12Z"/></svg></span>';
+  }
+
+  // =====================================================================
+  // STORY DATA — cover, chapters, choices, endings
+  // =====================================================================
+  var S = {};
+
+  S.cover = {
+    render: function(){
+      return '<div class="page cover">' +
+        '<div class="kicker">An Interactive Tragedy</div>' +
+        '<h1>Hamlet</h1>' +
+        '<div class="cover-divider"></div>' +
+        '<p class="lede">' + `You have come home from your studies to bury a father, and found a wedding instead. Denmark is unwell, though no one at court will say exactly why. Tonight, on the battlements, something is waiting that might finally tell you.` + '</p>' +
+        '<button class="btn-start" id="startBtn">Climb to the Battlements</button>' +
+        '<div class="credit">' + `Adapted from Shakespeare's Hamlet (c. 1600), a work in the public domain — this telling's prose, choices, and branching endings are an original interpretation.` + '</div>' +
+        '</div>';
+    },
+    bind: function(){
+      document.getElementById('startBtn').onclick = function(){
+        initAudio();
+        playAmbientBgm();
+        playPageTurnSound();
+        goto('ch1_intro');
+      };
+    },
+    scene: { key: 'cover', options: { particles: 'stars', mist: true, rays: true } },
+    character: null
+  };
+
+  function textScene(opts){
+    return {
+      render: function(changedKey){
+        var eyebrow = opts.chapter ? '<div class="eyebrow"><span>'+opts.chapter+'</span><span class="roman">'+opts.roman+'</span><span class="twig-rule"></span></div>' : '';
+        var title = opts.title ? '<h1 class="title">'+opts.title+'</h1>' : '';
+        var statsHtml = opts.showStats ? renderStats(changedKey) : '';
+        var body = '<div class="story">' + opts.paras.map(function(p){ return '<p>'+p+'</p>'; }).join('') + '</div>';
+        return '<div class="page">' + eyebrow + title + statsHtml + body +
+          '<div class="continue-row"><button class="btn-continue" id="contBtn">Continue</button></div></div>';
+      },
+      bind: function(){
+        document.getElementById('contBtn').onclick = function(){
+          playPageTurnSound();
+          goto(opts.next);
+        };
+      },
+      scene: opts.scene || { key: 'ch1', options: { particles: 'stars' } },
+      character: opts.character || null
+    };
+  }
+
+  function choiceScene(opts){
+    return {
+      render: function(changedKey){
+        var eyebrow = opts.chapter ? '<div class="eyebrow"><span>'+opts.chapter+'</span><span class="roman">'+opts.roman+'</span><span class="twig-rule"></span></div>' : '';
+        var title = opts.title ? '<h1 class="title">'+opts.title+'</h1>' : '';
+        var statsHtml = opts.showStats ? renderStats(changedKey) : '';
+        var body = '<div class="story">' + opts.paras.map(function(p){ return '<p>'+p+'</p>'; }).join('') + '</div>';
+        var items = opts.options.map(function(o,i){
+          return '<li><button class="choice-btn" data-i="'+i+'">'+choiceTwigSVG()+'<span>'+o.label+'</span></button></li>';
+        }).join('');
+        return '<div class="page">' + eyebrow + title + statsHtml + body +
+          '<ul class="choices">' + items + '</ul></div>';
+      },
+      bind: function(){
+        var btns = document.querySelectorAll('.choice-btn');
+        btns.forEach(function(btn){
+          btn.onclick = function(){
+            playChoiceSound();
+            var o = opts.options[parseInt(btn.getAttribute('data-i'),10)];
+            if(o.special){ goto(o.special); return; }
+            if(o.stat){ stats[o.stat] += o.delta; }
+            showReaction(opts, o);
+          };
+        });
+      },
+      scene: opts.scene || { key: 'ch1', options: { particles: 'stars' } },
+      character: opts.character || null
+    };
+  }
+
+  function showReaction(opts, o){
+    var eyebrow = opts.chapter ? '<div class="eyebrow"><span>'+opts.chapter+'</span><span class="roman">'+opts.roman+'</span><span class="twig-rule"></span></div>' : '';
+    var title = opts.title ? '<h1 class="title">'+opts.title+'</h1>' : '';
+    var statsHtml = opts.showStats ? renderStats(o.stat) : '';
+    var body = '<div class="story">' + opts.paras.map(function(p){ return '<p>'+p+'</p>'; }).join('') + '</div>';
+    var root = document.getElementById('sceneRoot');
+    root.innerHTML = '<div class="page">' + eyebrow + title + statsHtml + body +
+      '<p class="reaction">'+o.reaction+'</p>' +
+      '<div class="continue-row"><button class="btn-continue" id="contBtn2">Continue</button></div></div>';
+    document.getElementById('contBtn2').onclick = function(){
+      playPageTurnSound();
+      goto(o.next);
+    };
+  }
+
+  function endingScene(key, eyebrowTag, title, paras, tagline, epigraph, epigraphSource, accentVar){
+    return {
+      render: function(){
+        var body = '<div class="story">' + paras.map(function(p){ return '<p>'+p+'</p>'; }).join('') + '</div>';
+        var taglineHtml = tagline ? '<div class="ending-tagline">'+tagline+'</div>' : '';
+        var epigraphHtml = epigraph ? '<div class="epigraph">'+epigraph+'<span class="epigraph-source">'+(epigraphSource||'')+'</span></div>' : '';
+        var summary = '<div class="ending-stats">Resolve '+stats.resolve+' · Reason '+stats.reason+' · Bond '+stats.bond;
+        if(key==='resolve' || key==='reason' || key==='bond'){
+          var leaned = Math.min(6, Math.round(stats[key]/2));
+          summary += '<div class="ending-lean">'+leaned+' of 6 choices leaned toward '+eyebrowTag+'.</div>';
+        }
+        summary += '</div>';
+        var styleAttr = accentVar ? ' style="--accent:var(--'+accentVar+')"' : '';
+        return '<div class="page ending"'+styleAttr+'>' +
+          '<div class="ending-tag">Ending · '+eyebrowTag+'</div>' +
+          '<h1 class="title">'+title+'</h1>' +
+          taglineHtml + body + epigraphHtml + summary +
+          '<div class="continue-row"><button class="btn-restart" id="restartBtn">Climb Again</button></div></div>';
+      },
+      bind: function(){
+        document.getElementById('restartBtn').onclick = function(){
+          stats = { resolve:0, reason:0, bond:0 };
+          flags = { ophelia: null };
+          playPageTurnSound();
+          goto('cover');
+        };
+      },
+      scene: { key: 'ending', options: { particles: 'snow', mist: true } },
+      character: null
+    };
+  }
+
+  // ===================== ACT ONE — The Vow =====================
+
+  S.ch1_intro = textScene({
+    chapter:'Act One', roman:'I', title:'The Vow',
+    paras:[
+      `Two months ago your father was king. Now he is a name the court is already learning not to say too often, your uncle wears his crown, and — this is the part you cannot make sit still in your chest — your mother wears a wedding ring again. It is not the same ring.`,
+      `You came back from your studies at Wittenberg for a funeral and stayed for what everyone insists on calling a celebration. Tonight the guardsmen tell you, in low voices, that something has been walking the battlements at midnight wearing your father's armor. You go up to see for yourself.`
+    ],
+    next: 'ch1_choiceA',
+    scene: { key: 'ch1', options: { particles: 'stars', mist: true } }
+  });
+
+  S.ch1_choiceA = choiceScene({
+    chapter:'Act One', roman:'I', title:'The Vow',
+    paras: [`It is your father, or the shape grief has been waiting to pour itself into. It tells you plainly: he did not die of a serpent's sting in the orchard, as the court believes. He was murdered in his sleep — poison poured into his ear — by the brother who now sits on his throne. It does not ask whether you are sad. It asks whether you are sure, and then what you intend to do about it.`],
+    options: [
+      { label: `Swear the revenge on the spot, before the shape can vanish again`, stat:'resolve', delta:2,
+        reaction: `You give your word to a ghost at one in the morning, and some part of you already knows a promise made this fast will be expensive to keep.`, next:'ch1_bridge' },
+      { label: `Ask it how it knows, and why it waited two months to say so`, stat:'reason', delta:2,
+        reaction: `It answers, but not everything — and you notice, filing it away, that even the dead are capable of shaping a story to get what they want.`, next:'ch1_bridge' },
+      { label: `Ask instead whether your mother knows, whether she grieves, whether she is safe`, stat:'bond', delta:2,
+        reaction: `Its voice softens only for this. Leave her to heaven, it says — the one mercy it offers anyone tonight.`, next:'ch1_bridge' }
+    ],
+    scene: { key: 'ch1', options: { particles: 'stars', mist: true } }
+  });
+
+  S.ch1_bridge = textScene({
+    chapter:'Act One', roman:'I',
+    paras: [`Horatio and the two guardsmen swear on your sword to breathe no word of what they saw. Horatio, who followed you here from Wittenberg out of nothing but loyalty, says only one thing as you make your way back down: that this castle, in his experience, has never once given anyone back what they came looking for.`],
+    next: 'ch1_choiceB',
+    scene: { key: 'ch1', options: { particles: 'stars' } }
+  });
+
+  S.ch1_choiceB = choiceScene({
+    chapter:'Act One', roman:'I', title:'The Vow',
+    paras: [`Whatever you decide next, you cannot walk into the great hall tomorrow and accuse a crowned king of murder on a ghost's word alone. You need a shape for the weeks ahead.`],
+    options: [
+      { label: `Play mad — let the whole court believe grief has broken you, and use the cover to move`, stat:'resolve', delta:2,
+        reaction: `Word will reach your uncle within the week that the prince has gone strange. You find you don't mind being underestimated.`, next:'ch2_intro' },
+      { label: `Say nothing strange at all — watch, listen, decide nothing until you have more than a ghost's word`, stat:'reason', delta:2,
+        reaction: `You go on being exactly yourself, which turns out to be its own disguise. No one suspects a man who isn't performing anything.`, next:'ch2_intro' },
+      { label: `Tell Horatio everything, and let the plan be his to help carry, not yours alone`, stat:'bond', delta:2,
+        reaction: `Horatio doesn't ask you to prove any of it. He simply starts staying closer than usual, and you let him.`, next:'ch2_intro' }
+    ],
+    scene: { key: 'ch1', options: { particles: 'stars' } }
+  });
+
+  // ===================== ACT TWO — The Mousetrap =====================
+
+  S.ch2_intro = textScene({
+    chapter:'Act Two', roman:'II', title:'The Mousetrap',
+    paras: [
+      `Weeks pass. Word of your strangeness — whichever kind you chose to wear — has reached every corner of the court. Polonius, the king's councillor, has decided privately that you are mad with love for his daughter Ophelia, and has said so to the king and queen at considerable length. Claudius and Gertrude, less convinced, have sent for two old friends of yours from university to find out what you're really thinking. You are fairly sure why they've really been sent.`
+    ],
+    next: 'ch2_choiceA',
+    scene: { key: 'ch2', options: { particles: 'leaves', rays: true } }
+  });
+
+  // custom node — plants the Ophelia butterfly effect
+  S.ch2_choiceA = (function(){
+    var opts = {
+      chapter:'Act Two', roman:'II', title:'The Mousetrap',
+      paras: [`Ophelia finds you in a quiet gallery, carrying a small wooden box — the letters and keepsakes you once gave her, returned, she says, on her father's instruction. At the bottom of the box is a single pressed violet, gone the color of old tea. She asks, quietly, whether you want it back too, or whether she should just throw it out with everything else.`],
+      options: [
+        { label:`Tell her it hardly matters now — keep it, burn it, you have larger things to attend to`, stat:'resolve', delta:2, flagValue:'neglected',
+          reaction:`She closes the box without a word. It is a small thing to have said. It will not feel small later.`, next:'ch2_bridge' },
+        { label:`Ask, carefully, whether returning the box was truly her idea, or her father's`, stat:'reason', delta:2, flagValue:'suspected',
+          reaction:`She doesn't answer directly, and you decide that means yes — which tells you something about Polonius, and costs you something with her.`, next:'ch2_bridge' },
+        { label:`Tell her to keep the violet — whatever happens between you, none of it is her doing`, stat:'bond', delta:2, flagValue:'reassured',
+          reaction:`She puts the violet back in her sleeve instead of the box. It's a small thing. She will remember it longer than you expect.`, next:'ch2_bridge' }
+      ],
+      scene: { key: 'ch2', options: { particles: 'leaves', rays: true } }
+    };
+    return {
+      render: function(changedKey){ return choiceScene(opts).render(changedKey); },
+      bind: function(){
+        var btns = document.querySelectorAll('.choice-btn');
+        btns.forEach(function(btn){
+          btn.onclick = function(){
+            playChoiceSound();
+            var o = opts.options[parseInt(btn.getAttribute('data-i'),10)];
+            if(o.stat){ stats[o.stat] += o.delta; }
+            if(o.flagValue){ flags.ophelia = o.flagValue; }
+            showReaction(opts, o);
+          };
+        });
+      },
+      scene: opts.scene,
+      character: null
+    };
+  })();
+
+  S.ch2_bridge = textScene({
+    chapter:'Act Two', roman:'II',
+    paras: [`A company of travelling players arrives at the castle, and you see your chance. You have them add a short scene to their play — a king murdered in an orchard, poison poured in a sleeping ear — and arrange for it to be performed before the whole court, with your uncle watching from three feet away.`],
+    next: 'ch2_choiceB',
+    scene: { key: 'ch2', options: { particles: 'leaves', rays: true } }
+  });
+
+  S.ch2_choiceB = choiceScene({
+    chapter:'Act Two', roman:'II', title:'The Mousetrap',
+    paras: [`The player-king dies exactly as your father did. You watch your uncle's face and not the stage. He goes pale, then rises abruptly, calls for lights, and leaves the hall faster than a king should ever be seen to leave anything. It is, as close as you will ever get, a confession.`],
+    options: [
+      { label:`Go after him now, tonight, while the proof is still warm`, stat:'resolve', delta:2,
+        reaction:`You find him alone, kneeling in the chapel, and stand behind a praying man with your hand on your sword — and for reasons you'll spend the rest of your life questioning, you don't do it. Not yet.`, next:'ch3_intro' },
+      { label:`Hold — go to your mother's chamber first, and find out how much she has known all along`, stat:'reason', delta:2,
+        reaction:`Certainty about your uncle isn't the same as certainty about her, and you find you need both before you can act at all.`, next:'ch3_intro' },
+      { label:`Find Horatio first — one person in this castle should know exactly what happened, in case you don't survive knowing it yourself`, stat:'bond', delta:2,
+        reaction:`Horatio listens, says nothing for a long moment, then asks you — not for the first time — to just leave Elsinore with him tonight.`, next:'ch3_intro' }
+    ],
+    scene: { key: 'ch2', options: { particles: 'rain', mist: true } }
+  });
+
+  // ===================== ACT THREE — The Living and the Dead =====================
+
+  S.ch3_intro = textScene({
+    chapter:'Act Three', roman:'III', title:'The Living and the Dead',
+    paras: [
+      `Your mother's chamber, past midnight. You mean only to talk to her — to ask what she knows, to ask how she can bear the man now sleeping down the hall from where your father used to. It goes worse than you intended almost immediately. Somewhere behind the tapestry, someone moves, and gasps, and you don't think — you drive your sword through the fabric before the sound has even finished.`,
+      `It is Polonius. Ophelia's father, hiding to report every word back to the king, dead by your hand and no one else's. There is no version of tonight in which that fact goes away.`
+    ],
+    next: 'ch3_choiceA',
+    scene: { key: 'ch3', options: { particles: 'rain', mist: true } }
+  });
+
+  S.ch3_choiceA = choiceScene({
+    chapter:'Act Three', roman:'III', title:'The Living and the Dead',
+    paras: [`Your mother is staring at the body, and then at you, and you have perhaps thirty seconds before someone outside the door starts asking questions.`],
+    options: [
+      { label:`Lay it all out — the poison, the orchard, the haste of her remarriage — and demand she leave Claudius's bed tonight`, stat:'resolve', delta:2,
+        reaction:`She goes very still at the word poison, and you can't tell if it's the shock of hearing it, or the shock of finally hearing it said aloud.`, next:'ch3_bridge' },
+      { label:`Hold the accusation back and watch her instead — what she asks, what she doesn't, tells you everything`, stat:'reason', delta:2,
+        reaction:`She never once asks how your father actually died. You notice. You will keep noticing it for the rest of this.`, next:'ch3_bridge' },
+      { label:`Skip the accusation entirely — just beg her, plainly, not to go back to his bed`, stat:'bond', delta:2,
+        reaction:`She doesn't promise. But she doesn't call the guards either, and tonight that has to be enough.`, next:'ch3_bridge' }
+    ],
+    scene: { key: 'ch3', options: { particles: 'rain', mist: true } }
+  });
+
+  // custom node — branches on the Ophelia flag planted in Act Two
+  S.ch3_bridge = {
+    render: function(){
+      var eyebrow = '<div class="eyebrow"><span>Act Three</span><span class="roman">III</span><span class="twig-rule"></span></div>';
+      var p1 = `Claudius, badly shaken and now afraid of what you might do next, ships you off to England under guard, with sealed orders you're not meant to read. You never make it — pirates take the ship, and you talk your way back to Denmark within the fortnight, changed by it in ways you don't yet have words for. By the time you reach the coast, the worst of it has already happened without you.`;
+      var p2;
+      if(flags.ophelia === 'reassured'){
+        p2 = `Word reaches you first, from Horatio: Ophelia, grieving her father and undone by it, drowned in the river below the willows. But there's this — before it happened, she'd sent Horatio a small folded scrap with nothing on it but a pressed, colorless violet. No note was needed. You both already knew what it meant.`;
+      } else if(flags.ophelia === 'suspected'){
+        p2 = `Word reaches you first, from Horatio: Ophelia, grieving her father and convinced — not without reason — that you had used her as much as anyone else in this castle had, drowned in the river below the willows. She left nothing behind for you. You're not sure, given everything, that she owed you anything.`;
+      } else {
+        p2 = `Word reaches you first, from Horatio: Ophelia, grieving her father and certain that even you had stopped seeing her as anything but a piece on someone else's board, drowned in the river below the willows. There was no note. There was nothing, in the end, that you'd left her to write one with.`;
+      }
+      var p3 = `Laertes has come home from France to find his father buried without ceremony and his sister mad with grief before she died of it. He is, understandably, done listening to anyone's explanations. Claudius has already found him, and is already talking.`;
+      var body = '<div class="story"><p>'+p1+'</p><p>'+p2+'</p><p>'+p3+'</p></div>';
+      return '<div class="page">' + eyebrow + body +
+        '<div class="continue-row"><button class="btn-continue" id="contBtn">Continue</button></div></div>';
+    },
+    bind: function(){
+      document.getElementById('contBtn').onclick = function(){
+        playPageTurnSound();
+        goto('ch3_choiceB');
+      };
+    },
+    scene: { key: 'ch3', options: { particles: 'rain', mist: true } },
+    character: null
+  };
+
+  S.ch3_choiceB = choiceScene({
+    chapter:'Act Three', roman:'III', title:'The Living and the Dead',
+    paras: [`Word comes to you, days later: Laertes has agreed to something Claudius is calling a friendly match — rapiers, an audience, a chance for the whole court to watch the prince and the councillor's son settle things honorably. You are invited. You are also, you suspect, being managed.`],
+    options: [
+      { label:`Accept without conditions — whatever Claudius has planned, meet it head-on and end this one way or another`, stat:'resolve', delta:2,
+        reaction:`You send back your acceptance before you've let yourself think about it too long, which is, by now, more or less how you make every important decision.`, next:'ch4_intro' },
+      { label:`Accept, but ask Horatio to examine the blades and the cups beforehand, quietly`, stat:'reason', delta:2,
+        reaction:`Horatio agrees, though you both know that if Claudius has planned this properly, a quiet look an hour beforehand won't be enough to catch it.`, next:'ch4_intro' },
+      { label:`Send word to Laertes privately first — not about the duel, but an apology, man to man`, stat:'bond', delta:2,
+        reaction:`Laertes doesn't write back. But someone tells you he read the letter twice before he burned it, and you choose to take that as something.`, next:'ch4_intro' }
+    ],
+    scene: { key: 'ch3', options: { particles: 'stars', mist: true } }
+  });
+
+  // ===================== ACT FOUR — The Reckoning =====================
+
+  S.ch4_intro = textScene({
+    chapter:'Act Four', roman:'IV', title:'The Reckoning',
+    paras: [
+      `The hall is lit for an exhibition, torches doubled along both walls, the whole court seated as though this were entertainment and not the last unfinished business of two families and a stolen throne. Claudius has had a cup of wine set aside, he says, to toast the winner. Laertes stands across from you already holding two rapiers, and will not quite meet your eyes.`,
+      `You understand, standing there, that this room has been arranged by someone who has planned for you to lose no matter which way it goes. You have perhaps one more choice left that's entirely your own to make.`
+    ],
+    next: 'ch4_choice',
+    scene: { key: 'ch4', options: { particles: 'embers', fire: true, mist: false } }
+  });
+
+  S.ch4_choice = choiceScene({
+    chapter:'Act Four', roman:'IV', title:'The Reckoning',
+    paras: [`The room is waiting.`],
+    options: [
+      { label:`Set down the weapon they've handed you and name Claudius a murderer in front of the whole court, right now, before a single blade is drawn`, special:'ending_truth' },
+      { label:`Take up the rapier. Let the duel Claudius built decide it.`,
+        reaction:`You take the weight of the blade in your hand, and somewhere underneath the fear there is something almost like relief — after everything, at least this part is simple.`, next:'ch4_climax' }
+    ],
+    scene: { key: 'ch4', options: { particles: 'embers', fire: true, mist: false } }
+  });
+
+  S.ch4_climax = textScene({
+    chapter:'Act Four', roman:'IV',
+    paras: [
+      `It goes wrong almost immediately, and also exactly as arranged: Laertes draws blood with a blade that was never meant to be blunted, and in the scramble that follows, the rapiers change hands, and you draw blood back with the same poisoned steel. Across the hall, your mother — thirsty, unwatched, entirely unaware which cup was never meant for her — lifts the wine Claudius set aside, and drinks.`,
+      `Laertes, dying, finally says the one true thing anyone in this hall has said all night: the blade was poisoned, the cup was poisoned, none of it was ever a fair fight, and none of it, in the end, was really about the two of you at all.`
+    ],
+    next: '__compute_ending__',
+    scene: { key: 'ch4', options: { particles: 'embers', fire: true, mist: false } }
+  });
+
+  // ===================== ENDINGS =====================
+
+  S.ending_resolve = endingScene('resolve','Resolve','A Debt Paid in Steel',[
+    `You don't think, at the end, the way you thought at the beginning — weighing proofs, testing ghosts, waiting for a certainty that was never going to arrive. Poisoned, and past pretending otherwise, you close the last distance across the hall, force what's left of the cup between Claudius's teeth, and finish — badly, bloodily, nineteen years too late by any reasonable measure — exactly what you swore on the battlements you would do.`,
+    `You die admitting to Horatio only one fear: that the reasons for tonight will die with you, one more rumor about a mad prince. You make him promise, with what's left of your voice, to tell it straight.`,
+    `He does. Fortinbras arrives to a throne room full of bodies and takes the crown almost as an afterthought, and the story that survives you — for a while, at least — is the one where you finally stopped waiting.`
+  ],
+    `One who would rather be wrong in blood than right in silence.`,
+    `Some men wait their whole lives for permission. He only needed an ending.`,
+    `— inscribed, much later, on a sword no one could ever confirm was really his`,
+    'blood');
+
+  S.ending_reason = endingScene('reason','Reason','What the Prince Understood',[
+    `Even now, dying, some part of you is still doing the thing you've always done best — noticing. Not the pain, though there's plenty of that, but the shape of what has to happen next: Fortinbras is close, the throne cannot be left to guesswork, and only one man in this room has followed the whole thread from the orchard to tonight.`,
+    `You spend your last clear minutes making sure Horatio has it exactly right — not the feeling of it, the facts — so that whoever inherits Denmark inherits the truth along with it, and doesn't have to govern a country built on a story everyone privately doubts.`,
+    `Horatio keeps his word better than anyone in this play keeps anything. Fortinbras takes a crown with no mysteries attached to it, and the war a murkier ending might have bought Denmark simply, quietly, doesn't happen.`
+  ],
+    `One who would rather leave behind a clear account than a satisfied grudge.`,
+    `The truest men in Elsinore were the dead ones — at least they'd stopped changing their story.`,
+    `— from Horatio's private account, never published in his lifetime`,
+    'frost');
+
+  S.ending_bond = endingScene('bond','Bond','What Was Left to Love',[
+    `The cup, the crown, the nineteen-year-old oath — none of it is what you reach for first. It's your mother, swaying, the wine already working through her, and you're at her side before you've decided to move, too late to save her but not too late for her to know you tried.`,
+    `Laertes is dying a few feet away, and it's him you speak to next, not Claudius — an apology traded for an apology, a father for a father, a sister for nothing that can be given back, until whatever stood between your two families ends, for once, in forgiveness instead of another debt owed.`,
+    `Horatio survives to tell it, and the version that survives with him isn't really about a murdered king at all. It's about a prince who, given one last choice, chose the people bleeding in front of him over the ghost that sent him here.`
+  ],
+    `One who, given one last choice, chose the people in the room over the ghost that sent him there.`,
+    `He lost the crown, the girl, the father he was avenging, and the friend he might have been — and found, at the very end, he still had enough left to give away.`,
+    `— copied into the margins of an old Elsinore promptbook, author unknown`,
+    'gold');
+
+  S.ending_truth = endingScene('truth','The Naming','The Duel You Refused',[
+    `You set down the rapier before anyone's hand has closed properly around it, and the whole hall goes still in that particular way a room goes still when something happens that no one arranged. "This man," you say, pointing at a king in front of two hundred witnesses, "poisoned my father in his sleep, and has been managing this evening since before either of you walked in tonight" — and you say it to Laertes, not to the court, because Laertes is the one holding a blade he now has every reason to look at differently.`,
+    `It's Laertes who breaks first, not Claudius. He turns the rapier over in his hands, feels the edge that was never meant to be blunted, and can't finish what he came here to do, now that it has a name. Claudius reaches for the cup he prepared for you and finds two hundred people suddenly watching him drink it himself.`,
+    `No one calls this a victory, exactly. You don't get your father back, and Denmark doesn't get a clean story out of it either — Claudius's guilt has to be argued afterward, slowly, in rooms with fewer torches. But you get something the other three endings of this night don't: you get to still be standing in it. Horatio, for once, doesn't have to promise anyone he'll tell it. You're still here to tell it yourself.`
+  ],
+    `One who understood that the truth, spoken aloud, is its own kind of blade.`,
+    `It turned out the hardest thing in that whole cold country was not the killing. It was the saying so, out loud, before anyone else could.`,
+    `— from a ballad the palace guard were forbidden to sing, and sang anyway`,
+    'pearl');
+
+  function computeEnding(){
+    var order = ['bond','reason','resolve'];
+    var best = order[0];
+    order.forEach(function(k){ if(stats[k] > stats[best]) best = k; });
+    return 'ending_' + best;
+  }
+
+  // =====================================================================
+  // ENGINE — DO NOT EDIT BELOW (computeEnding tie-break order excepted)
+  // =====================================================================
+  function goto(id){
+    if(id === '__compute_ending__'){ id = computeEnding(); }
+    var scene = S[id];
+    if(!scene){ console.error('Scene not found:', id); return; }
+
+    if(scene.scene){
+      setScene(scene.scene.key, scene.scene.options);
+    }
+    if(scene.character){
+      showCharacter(scene.character.url, scene.character.name, scene.character.position);
+    } else {
+      showCharacter(null);
+    }
+
+    var root = document.getElementById('sceneRoot');
+    try {
+      root.innerHTML = scene.render();
+    } catch(e) {
+      root.innerHTML = '<div class="page"><p>Something went wrong loading this scene. Please refresh the page.</p></div>';
+      return;
+    }
+
+    if(scene.bind){
+      try { scene.bind(); } catch(e) {}
+    }
+
+    window.scrollTo({top:0, behavior:'instant'});
+  }
+
+  // ===================== init =====================
+  function init(){
+    try {
+      setScene('cover', { particles: 'stars', mist: true, rays: true });
+      goto('cover');
+      setTimeout(function(){
+        var loading = document.getElementById('loadingScreen');
+        if(loading) loading.classList.add('hidden');
+      }, 1500);
+    } catch(e) {
+      document.getElementById('sceneRoot').innerHTML = '<div class="page"><p>Failed to initialize. Please refresh the page.</p></div>';
+    }
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  document.addEventListener('click', function(){ initAudio(); }, { once: true });
+
+})();
+</script>
+</body>
+</html>
