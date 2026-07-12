@@ -16,7 +16,7 @@ Three games built with this skill, from three very different sources:
 | **The Trial** | Kafka, *The Trial* | Direct adaptation (public domain) |
 | **Hamlet — An Interactive Tragedy** | Shakespeare, *Hamlet* | Direct adaptation (public domain) |
 
-A complete worked example ships in [`examples/hamlet-en.html`](examples/hamlet-en.html) — open it in any browser to see what the skill actually outputs.
+A complete worked example ships in https://tidalmoss.itch.io/hamlet-an-interactive-tragedy — open it in any browser to see what the skill actually outputs.
 
 > Replace this section's links with your live URLs once deployed.
 
