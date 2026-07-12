@@ -3,7 +3,6 @@
 A Claude Skill that turns literary works into playable, single-file HTML interactive fiction — with meaningful choices, hidden value axes, butterfly effects, and endings that read as personality verdicts rather than win/lose states.
 
 No build step. No dependencies. One HTML file you can double-click, host on GitHub Pages, or upload to itch.io.
-e.g. https://tidalmoss.itch.io/hamlet-an-interactive-tragedy
 ---
 
 ## What it produces
